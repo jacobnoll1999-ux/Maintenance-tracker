@@ -1,0 +1,720 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAC-MAINT: Field Maintenance & Work Order System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        tactical: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                            600: '#475569',
+                            accent: '#f59e0b', // Safety Amber
+                            green: '#10b981',  // Status OK
+                            red: '#ef4444',    // High Urgency
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-font {
+            font-family: 'Share Tech Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-amber-500 selection:text-slate-950">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-amber-500 text-slate-950 p-2 rounded font-black tracking-wider flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-wrench text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold tracking-wider text-lg sm:text-xl flex items-center gap-2">
+                        TAC-MAINT <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-500/30 mono-font">WEB PORTAL</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Browser-Based Field Work Order System</p>
+                </div>
+            </div>
+
+            <!-- View Switcher Tabs -->
+            <div class="flex items-center space-x-1 sm:space-x-2 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <button onclick="switchView('submit')" id="nav-submit" class="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow">
+                    <i class="fa-solid fa-qrcode"></i> <span class="hidden xs:inline">Submit Ticket</span>
+                </button>
+                <button onclick="switchView('dashboard')" id="nav-dashboard" class="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-list-check"></i> <span class="hidden xs:inline">Dashboard</span> <span id="badge-count" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-amber-400">0</span>
+                </button>
+                <button onclick="switchView('qr')" id="nav-qr" class="px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-barcode"></i> <span class="hidden xs:inline">QR Station</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ================= VIEW 1: SUBMIT WORK ORDER (QR SCANNER / WEBSITE ENTRY) ================= -->
+        <section id="view-submit" class="max-w-xl mx-auto space-y-6">
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                
+                <div class="text-center pb-6 border-b border-slate-800">
+                    <div class="inline-block p-3 rounded-full bg-slate-800/80 text-amber-400 mb-2 border border-slate-700">
+                        <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white">Report Maintenance Issue</h2>
+                    <p class="text-sm text-slate-400 mt-1">Submit via browser link or QR scan. Direct transmission to maintenance shop.</p>
+                </div>
+
+                <form id="workOrderForm" onsubmit="handleFormSubmit(event)" class="space-y-4 pt-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                            <i class="fa-solid fa-user text-amber-500 mr-1"></i> Your Name / Rank / Unit
+                        </label>
+                        <input type="text" id="sub-name" required placeholder="e.g., SSgt Miller, J. (Alpha Co)" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                <i class="fa-solid fa-building text-amber-500 mr-1"></i> Location / Building #
+                            </label>
+                            <input type="text" id="sub-location" required placeholder="e.g., Bldg 402, Bay 3" 
+                                class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                <i class="fa-solid fa-gauge text-amber-500 mr-1"></i> Urgency Level
+                            </label>
+                            <select id="sub-urgency" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-amber-500 transition-colors">
+                                <option value="Low">Low - Routine Fix</option>
+                                <option value="Medium" selected>Medium - Impaired Operation</option>
+                                <option value="High">High - Safety Hazard / Critical</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                            <i class="fa-solid fa-pen-to-square text-amber-500 mr-1"></i> Description of Damage / Issue
+                        </label>
+                        <textarea id="sub-description" rows="4" required placeholder="Describe the damage, equipment failure, or facility issue in detail..." 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors resize-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                            <i class="fa-solid fa-clock text-amber-500 mr-1"></i> Timestamp (Auto-Filled)
+                        </label>
+                        <input type="text" id="sub-timestamp" readonly 
+                            class="w-full bg-slate-950/50 border border-slate-900 rounded-lg px-4 py-3 text-slate-400 mono-font text-sm select-none cursor-not-allowed">
+                    </div>
+
+                    <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3.5 px-6 rounded-lg transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 mt-2">
+                        <i class="fa-solid fa-paper-plane"></i> Transmit Work Order
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Success Modal / Overlay State -->
+        <div id="success-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-fade-in">
+                <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
+                    <i class="fa-solid fa-check text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white">Work Order Transmitted</h3>
+                <p class="text-sm text-slate-400">Your maintenance request has been successfully logged into the website database. Tracking ID: <span id="success-id" class="text-amber-400 mono-font font-bold"></span></p>
+                <div class="pt-2">
+                    <button onclick="closeSuccessModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 rounded-lg transition-colors border border-slate-700">
+                        Submit Another Ticket
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VIEW 2: ADMIN / MAINTENANCE DASHBOARD ================= -->
+        <section id="view-dashboard" class="space-y-6 hidden">
+            <!-- Dashboard Controls Header -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 flex flex-col lg:flex-row gap-4 items-center justify-between shadow-lg">
+                <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                    <div class="relative flex-1 sm:flex-initial min-w-[220px]">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="dash-search" oninput="renderDashboard()" placeholder="Search building or name..." 
+                            class="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500">
+                    </div>
+                    
+                    <select id="filter-status" onchange="renderDashboard()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-amber-500">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+
+                    <select id="filter-urgency" onchange="renderDashboard()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-amber-500">
+                        <option value="ALL">All Urgencies</option>
+                        <option value="High">High Urgency</option>
+                        <option value="Medium">Medium Urgency</option>
+                        <option value="Low">Low Urgency</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3 w-full lg:w-auto justify-end flex-wrap">
+                    <button onclick="exportCSV()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold rounded-lg text-slate-300 transition-colors flex items-center gap-1.5" title="Export CSV for Records">
+                        <i class="fa-solid fa-file-arrow-down text-amber-500"></i> Export CSV
+                    </button>
+                    <button onclick="loadSampleData()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold rounded-lg text-slate-300 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-database text-amber-500"></i> Demo Data
+                    </button>
+                    <button onclick="clearAllOrders()" class="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs font-semibold rounded-lg text-red-400 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-trash-can"></i> Purge All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Overview Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Tickets</p>
+                        <h4 id="stat-total" class="text-2xl font-bold text-white mt-1 mono-font">0</h4>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-700">
+                        <i class="fa-solid fa-ticket"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wider text-amber-400">Pending</p>
+                        <h4 id="stat-pending" class="text-2xl font-bold text-amber-400 mt-1 mono-font">0</h4>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
+                        <i class="fa-solid fa-hourglass-start"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wider text-blue-400">In Progress</p>
+                        <h4 id="stat-progress" class="text-2xl font-bold text-blue-400 mt-1 mono-font">0</h4>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                        <i class="fa-solid fa-person-digging"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wider text-emerald-400">Completed</p>
+                        <h4 id="stat-completed" class="text-2xl font-bold text-emerald-400 mt-1 mono-font">0</h4>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Work Orders Table / Grid -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950/80 border-b border-slate-800 text-xs uppercase tracking-wider text-slate-400">
+                                <th class="p-4">Ticket ID</th>
+                                <th class="p-4">Reporter / Bldg</th>
+                                <th class="p-4">Urgency</th>
+                                <th class="p-4">Description</th>
+                                <th class="p-4">Assigned Crew</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-table-body" class="divide-y divide-slate-800 text-sm">
+                            <!-- Populated dynamically via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="hidden p-12 text-center">
+                    <div class="text-slate-600 text-4xl mb-3"><i class="fa-solid fa-folder-open"></i></div>
+                    <p class="text-slate-400 font-medium">No work orders found matching current filters.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 3: QR CODE GENERATOR ================= -->
+        <section id="view-qr" class="max-w-xl mx-auto space-y-6 hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl text-center space-y-6">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white">Work Order QR Code Station</h2>
+                    <p class="text-sm text-slate-400 mt-1">Display or print this QR code around camp, workshops, and facilities. Scanning it opens this website directly to the submission form on any smartphone camera.</p>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl inline-block shadow-lg mx-auto border-4 border-slate-800">
+                    <div id="qrcode" class="flex justify-center items-center"></div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-xs mono-font text-slate-300">
+                        <span id="qr-target-url" class="truncate mr-2"></span>
+                        <button onclick="copyQRUrl()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded transition-colors shrink-0">
+                            <i class="fa-solid fa-copy mr-1"></i> Copy Link
+                        </button>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button onclick="window.print()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow">
+                            <i class="fa-solid fa-print"></i> Print QR Poster
+                        </button>
+                        <button onclick="regenerateQR()" class="px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-3 rounded-lg transition-colors border border-slate-700">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Assign Crew Modal -->
+    <div id="assign-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-amber-500"></i> Assign Maintenance Personnel
+            </h3>
+            <p class="text-xs text-slate-400">Assign a technician or shop squad to ticket <span id="assign-ticket-id" class="text-amber-400 mono-font font-bold"></span></p>
+            
+            <input type="text" id="assign-crew-name" placeholder="e.g., HVAC Team Alpha / SPC Davis" 
+                class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500">
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeAssignModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 rounded-lg text-sm border border-slate-700 transition-colors">Cancel</button>
+                <button onclick="saveAssignment()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-lg text-sm transition-colors shadow">Save Assignment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // Storage Key for Browser LocalStorage persistence
+        const STORAGE_KEY = 'tac_maint_work_orders_web_v1';
+
+        // Initialize App State
+        let workOrders = [];
+        let currentAssignId = null;
+
+        // On Load
+        window.onload = function() {
+            loadOrders();
+            updateTimestampInput();
+            initQRCode();
+            
+            // Check if URL has hash view parameter
+            if(window.location.hash === '#dashboard') {
+                switchView('dashboard');
+            } else if(window.location.hash === '#qr') {
+                switchView('qr');
+            }
+
+            // Auto refresh timestamp every minute if on submit form
+            setInterval(updateTimestampInput, 60000);
+        };
+
+        // Timestamp generator
+        function updateTimestampInput() {
+            const now = new Date();
+            const formatted = now.toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+            const input = document.getElementById('sub-timestamp');
+            if(input) input.value = formatted;
+        }
+
+        // Load orders from LocalStorage
+        function loadOrders() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    workOrders = JSON.parse(stored);
+                } else {
+                    // Default starter demo data if empty
+                    workOrders = [
+                        {
+                            id: 'WO-1042',
+                            name: 'Sgt Ramirez, K.',
+                            location: 'Bldg 101, Dining Facility',
+                            urgency: 'High',
+                            description: 'Walk-in freezer temperature fluctuating above safe threshold. Potential compressor failure.',
+                            timestamp: '2026-10-08 08:30 UTC',
+                            status: 'In Progress',
+                            assigned: 'Refrigeration Shop (SSgt Vance)'
+                        },
+                        {
+                            id: 'WO-1041',
+                            name: 'Capt Chen, L.',
+                            location: 'HQ Command Post, Room 12',
+                            urgency: 'Medium',
+                            description: 'Main briefing room projector bulb flickering and shutting down intermittently.',
+                            timestamp: '2026-10-08 07:15 UTC',
+                            status: 'Pending',
+                            assigned: 'Unassigned'
+                        },
+                        {
+                            id: 'WO-1040',
+                            name: 'Cpl Jenkins, T.',
+                            location: 'Vehicle Maintenance Bay 4',
+                            urgency: 'Low',
+                            description: 'Eyewash station inspection tag missing and minor drip on supply line.',
+                            timestamp: '2026-10-07 16:45 UTC',
+                            status: 'Completed',
+                            assigned: 'Plumbing Team B'
+                        }
+                    ];
+                    saveOrders();
+                }
+            } catch (e) {
+                console.error("Failed to load local storage", e);
+                workOrders = [];
+            }
+            updateBadgeCount();
+        }
+
+        // Save orders to LocalStorage
+        function saveOrders() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(workOrders));
+            } catch (e) {
+                console.error("Failed to save to local storage", e);
+            }
+            updateBadgeCount();
+        }
+
+        // Update Dashboard Badge Counter
+        function updateBadgeCount() {
+            const badge = document.getElementById('badge-count');
+            if (badge) {
+                badge.textContent = workOrders.length;
+                const pendingCount = workOrders.filter(w => w.status === 'Pending').length;
+                if(pendingCount > 0) {
+                    badge.className = "ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-slate-950 font-bold";
+                } else {
+                    badge.className = "ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-400";
+                }
+            }
+        }
+
+        // View Switcher logic
+        function switchView(viewName) {
+            const views = ['submit', 'dashboard', 'qr'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                const nav = document.getElementById(`nav-${v}`);
+                if (v === viewName) {
+                    el.classList.remove('hidden');
+                    nav.className = "px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow";
+                } else {
+                    el.classList.add('hidden');
+                    nav.className = "px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center gap-1.5 text-slate-400 hover:text-slate-200";
+                }
+            });
+
+            if(viewName === 'dashboard') {
+                renderDashboard();
+            }
+        }
+
+        // Handle Public Submission Form
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('sub-name').value.trim();
+            const location = document.getElementById('sub-location').value.trim();
+            const urgency = document.getElementById('sub-urgency').value;
+            const description = document.getElementById('sub-description').value.trim();
+            const timestamp = document.getElementById('sub-timestamp').value;
+
+            const randomId = 'WO-' + Math.floor(1000 + Math.random() * 9000);
+
+            const newOrder = {
+                id: randomId,
+                name,
+                location,
+                urgency,
+                description,
+                timestamp,
+                status: 'Pending',
+                assigned: 'Unassigned'
+            };
+
+            workOrders.unshift(newOrder);
+            saveOrders();
+
+            // Show success modal
+            document.getElementById('success-id').textContent = randomId;
+            document.getElementById('success-modal').classList.remove('hidden');
+
+            // Reset form
+            document.getElementById('workOrderForm').reset();
+            updateTimestampInput();
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('success-modal').classList.add('hidden');
+        }
+
+        // Render Dashboard Table and Stats
+        function renderDashboard() {
+            const tbody = document.getElementById('dashboard-table-body');
+            const emptyState = document.getElementById('empty-state');
+            const searchQuery = document.getElementById('dash-search').value.toLowerCase();
+            const statusFilter = document.getElementById('filter-status').value;
+            const urgencyFilter = document.getElementById('filter-urgency').value;
+
+            // Compute Stats
+            const total = workOrders.length;
+            const pending = workOrders.filter(w => w.status === 'Pending').length;
+            const progress = workOrders.filter(w => w.status === 'In Progress').length;
+            const completed = workOrders.filter(w => w.status === 'Completed').length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-pending').textContent = pending;
+            document.getElementById('stat-progress').textContent = progress;
+            document.getElementById('stat-completed').textContent = completed;
+
+            // Filter Orders
+            const filtered = workOrders.filter(order => {
+                const matchesSearch = order.location.toLowerCase().includes(searchQuery) || 
+                                      order.name.toLowerCase().includes(searchQuery) ||
+                                      order.id.toLowerCase().includes(searchQuery) ||
+                                      order.description.toLowerCase().includes(searchQuery);
+                const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
+                const matchesUrgency = urgencyFilter === 'ALL' || order.urgency === urgencyFilter;
+                return matchesSearch && matchesStatus && matchesUrgency;
+            });
+
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach(order => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/50 transition-colors";
+
+                // Urgency badge color
+                let urgencyBadgeClass = "bg-slate-800 text-slate-300 border-slate-700";
+                if(order.urgency === 'High') urgencyBadgeClass = "bg-red-500/10 text-red-400 border-red-500/30";
+                if(order.urgency === 'Medium') urgencyBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+                if(order.urgency === 'Low') urgencyBadgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/30";
+
+                // Status badge color
+                let statusBadgeClass = "bg-slate-800 text-slate-300";
+                if(order.status === 'Pending') statusBadgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/30";
+                if(order.status === 'In Progress') statusBadgeClass = "bg-blue-500/10 text-blue-400 border border-blue-500/30";
+                if(order.status === 'Completed') statusBadgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+
+                tr.innerHTML = `
+                    <td class="p-4 align-top">
+                        <span class="font-bold mono-font text-amber-400">${order.id}</span>
+                        <div class="text-xs text-slate-500 mono-font mt-0.5">${order.timestamp}</div>
+                    </td>
+                    <td class="p-4 align-top">
+                        <div class="font-semibold text-white">${order.location}</div>
+                        <div class="text-xs text-slate-400">Reporter: ${order.name}</div>
+                    </td>
+                    <td class="p-4 align-top">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${urgencyBadgeClass}">
+                            ${order.urgency}
+                        </span>
+                    </td>
+                    <td class="p-4 align-top max-w-xs">
+                        <p class="text-slate-300 text-xs line-clamp-2">${escapeHtml(order.description)}</p>
+                    </td>
+                    <td class="p-4 align-top">
+                        <div class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-shield text-slate-500"></i> ${escapeHtml(order.assigned)}
+                        </div>
+                        <button onclick="openAssignModal('${order.id}')" class="text-[11px] text-amber-400 hover:underline mt-1 inline-block">
+                            <i class="fa-solid fa-pen mr-0.5"></i> Change Crew
+                        </button>
+                    </td>
+                    <td class="p-4 align-top">
+                        <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-xs rounded px-2.5 py-1.5 font-semibold focus:outline-none transition-colors ${statusBadgeClass}">
+                            <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                            <option value="In Progress" ${order.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Completed" ${order.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </td>
+                    <td class="p-4 align-top text-right space-x-2">
+                        <button onclick="deleteOrder('${order.id}')" class="p-2 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800" title="Delete Ticket">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Update Status from Dropdown
+        function updateOrderStatus(id, newStatus) {
+            const order = workOrders.find(w => w.id === id);
+            if(order) {
+                order.status = newStatus;
+                saveOrders();
+                renderDashboard();
+            }
+        }
+
+        // Assign Crew Modal handlers
+        function openAssignModal(id) {
+            currentAssignId = id;
+            const order = workOrders.find(w => w.id === id);
+            document.getElementById('assign-ticket-id').textContent = id;
+            document.getElementById('assign-crew-name').value = order.assigned === 'Unassigned' ? '' : order.assigned;
+            document.getElementById('assign-modal').classList.remove('hidden');
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assign-modal').classList.add('hidden');
+            currentAssignId = null;
+        }
+
+        function saveAssignment() {
+            const crewName = document.getElementById('assign-crew-name').value.trim();
+            if(currentAssignId && crewName) {
+                const order = workOrders.find(w => w.id === currentAssignId);
+                if(order) {
+                    order.assigned = crewName;
+                    saveOrders();
+                    renderDashboard();
+                }
+            }
+            closeAssignModal();
+        }
+
+        // Delete Single Order
+        function deleteOrder(id) {
+            workOrders = workOrders.filter(w => w.id !== id);
+            saveOrders();
+            renderDashboard();
+        }
+
+        // Clear All Orders
+        function clearAllOrders() {
+            if(confirm('Are you sure you want to purge all work order records from local storage?')) {
+                workOrders = [];
+                saveOrders();
+                renderDashboard();
+            }
+        }
+
+        // Load Sample Data
+        function loadSampleData() {
+            localStorage.removeItem(STORAGE_KEY);
+            loadOrders();
+            renderDashboard();
+        }
+
+        // Export CSV Function
+        function exportCSV() {
+            if(workOrders.length === 0) {
+                alertCustom("No work orders to export.");
+                return;
+            }
+            let csv = 'Ticket ID,Timestamp,Reporter,Location,Urgency,Status,Assigned Crew,Description\n';
+            workOrders.forEach(w => {
+                const desc = `"${w.description.replace(/"/g, '""')}"`;
+                csv += `${w.id},${w.timestamp},"${w.name}","${w.location}",${w.urgency},${w.status},"${w.assigned}",${desc}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tac-maint-export-${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // QR Code Generator functionality
+        let qrInstance = null;
+        function initQRCode() {
+            const container = document.getElementById('qrcode');
+            container.innerHTML = '';
+            
+            // Generate link pointing to current website URL
+            const targetUrl = window.location.href.split('#')[0];
+            document.getElementById('qr-target-url').textContent = targetUrl;
+
+            qrInstance = new QRCode(container, {
+                text: targetUrl,
+                width: 180,
+                height: 180,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        function regenerateQR() {
+            initQRCode();
+        }
+
+        function copyQRUrl() {
+            const targetUrl = document.getElementById('qr-target-url').textContent;
+            const textArea = document.createElement("textarea");
+            textArea.value = targetUrl;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alertCustom("Submission link copied to clipboard!");
+            } catch (err) {
+                console.error('Failed to copy', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // Custom non-blocking alert substitute
+        function alertCustom(msg) {
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-5 right-5 bg-amber-500 text-slate-950 px-4 py-2.5 rounded-lg shadow-xl font-bold text-sm z-50 animate-bounce";
+            toast.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i> ${msg}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Helper for sanitizing strings
+        function escapeHtml(str) {
+            if(!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
+```
